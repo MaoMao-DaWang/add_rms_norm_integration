@@ -1,0 +1,16 @@
+/build/
+/results/
+__pycache__/
+*.py[cod]
+*.so
+*.o
+*.a
+*.whl
+*.egg-info/
+.venv/
+venv/
+/models/
+*.safetensors
+*.pt
+*.pth
+*.bin
