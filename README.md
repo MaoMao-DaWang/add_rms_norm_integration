@@ -2,8 +2,9 @@
 
 目标环境：Ascend 910B3 / CANN 9.0.0 / PyTorch 2.8.0 / torch_npu 2.8.0.post4。
 这是独立工程，支持前向推理；尚未实现 backward、TorchAir converter 或图模式适配。
-本机没有 CANN/NPU，交付时仅完成 CPU 数学模拟、适配代码结构测试和静态检查。
-远端编译和真机验证的结果需要单独记录。
+本机没有 CANN/NPU；本地完成 CPU 数学模拟、适配代码结构测试和静态检查。
+2026-11-03 用户已在远端完成编译及51个 NPU 快速用例，详见 `VALIDATION.md`。
+完整用例和模型验证的结果仍需单独记录。
 
 ## 1. 上传、检查和构建
 
@@ -71,6 +72,18 @@ python3 bench_operator.py --rows 128 --hidden 4096 --dtype bfloat16 --model-comp
 开销会影响结果，不能把流间隔当作单条硬件 kernel 的纯执行时间。纯 kernel 性能应另用 msprof。
 
 ## 4. 接入本地千问模型
+
+没有预训练权重时，可以先执行随机初始化的两层 Qwen3 集成测试：
+
+```bash
+python3 test_qwen_tiny.py
+python3 test_qwen_tiny.py --all-dtypes
+```
+
+这不访问网络，不需要 tokenizer 或 checkpoint。它比较融合前后的 prefill logits、
+KV Cache 单步 decode、4个 greedy token，检查每层自定义算子调用，以及恢复原始 forward。
+测试只证明这套集成路径能工作，不代表验证了预训练模型质量或真实大模型性能。
+结果写入 `results/tiny_qwen_report.json`。
 
 首版适配普通 `model_type=qwen2/qwen3` 的 causal LM；不默认适配 MoE、VL、Next 或 Qwen3.5。
 用 `inspect_env.py` 查找已下载模型的 config.json，或手工提供模型目录。
