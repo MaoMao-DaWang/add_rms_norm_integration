@@ -10,3 +10,4 @@ cmake -S "$project_dir" -B "$project_dir/build" \
     -DCMAKE_ASC_ARCHITECTURES=dav-2201
 cmake --build "$project_dir/build" --parallel "${BUILD_JOBS:-2}"
 python3 "$project_dir/test_operator.py" --quick
+python3 "$project_dir/test_pipeline.py"

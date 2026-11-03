@@ -3,8 +3,8 @@
 目标环境：Ascend 910B3 / CANN 9.0.0 / PyTorch 2.8.0 / torch_npu 2.8.0.post4。
 这是独立工程，支持前向推理；尚未实现 backward、TorchAir converter 或图模式适配。
 本机没有 CANN/NPU；本地完成 CPU 数学模拟、适配代码结构测试和静态检查。
-2026-11-03 用户已在远端完成编译及51个 NPU 快速用例，详见 `VALIDATION.md`。
-完整用例和模型验证的结果仍需单独记录。
+2026-11-03 用户已在远端完成编译、51个 NPU 快速用例和完整219个 NPU 用例，详见 `VALIDATION.md`。
+性能测量和模型验证的结果仍需单独记录。
 
 ## 1. 上传、检查和构建
 
@@ -26,6 +26,9 @@ python3 test_operator.py
 构建产物为 `build/libarm_kernels.so` 和 `build/libarm_torch.so`。
 接口层使用 PyTorch 分配 NPU 张量，并在 PyTorch 当前 stream 上调用 Ascend C 核函数。
 不会创建私有 stream，不在每次调用时同步设备或进行 CPU 中转。
+直调前用 `getCurrentNPUStream().stream(true)` 等待 TorchNPU 主机任务队列完成下发，
+保证此前 PyTorch 生产者运算在同一设备流中排在自定义 kernel 前面。
+这一步不是设备执行完成同步；使用 `.stream(false)` 直接取流可能破坏生产者/消费者顺序。
 
 ## 2. 算子接口和精度语义
 
@@ -60,6 +63,10 @@ y/residual_out 与输入 shape 和 dtype 一致；rstd 为 FP32，shape 为输�
 16384隐藏维、全零行、epsilon 变化、输入不变，以及非默认 stream。
 残差输出要求精确匹配，FP32/rstd 使用1e-4级阈值，FP16/BF16使用相应低精度阈值。
 这些是初始工程阈值，若课程另有标准，应按课程标准收紧并重新测试。
+
+`test_pipeline.py` 额外验证96个连续生产者/消费者用例。在输入的普通 PyTorch 运算和
+自定义算子启动之间不插入 `.cpu()`、`.item()` 或设备同步，覆盖默认/非默认 stream。
+`build.sh` 会在51个快速用例后运行这项回归测试。
 
 ```bash
 python3 bench_operator.py --rows 32 --hidden 1024 --dtype float16

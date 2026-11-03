@@ -54,7 +54,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> add_rms_norm(
     auto statShape = x1.sizes().vec();
     statShape.pop_back();
     auto rstd = at::empty(statShape, x1.options().dtype(at::kFloat));
-    auto stream = c10_npu::getCurrentNPUStream().stream(false);
+    // Drain TorchNPU's host task queue before a direct kernel launch, so queued
+    // producers reach the device stream before this consumer. This does not
+    // synchronize completion of device execution.
+    auto stream = c10_npu::getCurrentNPUStream().stream(true);
     arm_launch(x1.data_ptr(), x2.data_ptr(), gamma.data_ptr(),
         y.data_ptr(), rstd.data_ptr(), residual.data_ptr(),
         static_cast<uint32_t>(rows), static_cast<uint32_t>(cols), dtype,

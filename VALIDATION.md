@@ -12,11 +12,27 @@
 PASS: 51 NPU cases; three outputs, both rounding modes, tails, non-default stream
 ```
 
-已验证：FP32/FP16/BF16、两种计算语义、三路输出、部分非对齐形状、
-全零行、输入不变、输出不共享存储、非默认 stream。
+随后用户运行 `python3 test_operator.py`，完整测试通过：
 
-尚待执行：完整219个单算子用例、性能测量、随机微型Qwen3集成测试、
-预训练千问模型精度和性能对比。不得把快速用例通过等同于这些验证已经完成。
+```text
+PASS: 219 NPU cases; three outputs, both rounding modes, tails, non-default stream
+```
+
+已验证：FP32/FP16/BF16、两种计算语义、三路输出、部分非对齐形状、
+全零行、epsilon 变化（1e-8 / 1e-6 / 0.5）、输入不变、输出不共享存储、非默认 stream。
+
+尚待执行：性能测量、随机微型Qwen3集成测试、预训练千问模型精度和性能对比。
+不得把单算子正确性通过等同于模型精度和性能验证已经完成。
+
+### 首次微型模型测试失败，修复待复测
+
+用户在内联微型Qwen3测试中遇到 `AssertionError: 生成 token 不一致`。
+该脚本在检查 logits 前先检查 token，尚无 logits 差异数据，不能断言只是舍入误差。
+检查发现启动封装使用 `getCurrentNPUStream().stream(false)`，跳过 TorchNPU 主机任务队列下发检查。
+已改为 `.stream(true)`，以保证直接启动前的框架生产者任务已下发；不等待设备执行完成。
+修复依据为 TorchNPU NPUStream 实现与 op-plugin 的 Ascend C 直调示例。
+新增 `test_pipeline.py`，验证无中间CPU读取的连续生产者/消费者调用，共96个用例。
+修复后编译、回归测试与微型模型结果尚待用户在NPU执行，未标记通过。
 
 构建日志中的 Kineto 静态库 warning 未阻止编译。
 `torch.zeros_like` 的内部格式 warning 未阻止上述测试通过。
